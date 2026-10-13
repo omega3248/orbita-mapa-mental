@@ -4,7 +4,7 @@ Un mapa mental espacial para ordenar ideas de forma más natural, visual e inter
 
 ## Qué puedes hacer
 
-- Crear, editar y eliminar ideas, becas u oportunidades.
+- Crear, editar y eliminar ideas.
 - Arrastrar cuadros por el espacio y ajustar ancho, largo y alto.
 - Mover la vista, girar la perspectiva y hacer zoom hacia el puntero.
 - Seleccionar varios cuadros con **Ctrl + clic** y conectarlos.
