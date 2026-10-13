@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101d21">
+  <meta name="description" content="Tu mapa de becas, formación y emprendimiento. Mueve las oportunidades, cambia su importancia y construye tu siguiente paso.">
+  <title>Órbita · Oportunidades de Julián</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css?v=connections-7">
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <a class="brand" href="#" aria-label="Órbita, inicio"><span class="brand-mark">◎</span><span>órbita<span class="brand-sub">TU SIGUIENTE PASO</span></span></a>
+    <div class="project-name">Julián <span>/</span> Mapa de oportunidades</div>
+    <div class="top-actions"><span class="save-indicator" id="save-indicator" role="status">Guardado en este navegador</span><button class="button primary" id="add">＋ <span>Nueva oportunidad</span></button><button class="icon-button" id="menu-button" aria-label="Abrir opciones" aria-expanded="false">•••</button></div>
+    <div id="file-menu" class="file-menu" hidden><button id="export">↓ Exportar mapa</button><button id="import">↑ Importar oportunidades</button><button id="help-open">? Cómo usarlo</button><p>El mapa se guarda en este navegador. Exporta una copia para llevarlo a otro dispositivo.</p></div>
+    <input type="file" id="import-file" accept="application/json,.json" hidden>
+  </header>
+  <div class="workspace">
+    <aside class="sidebar" aria-label="Colecciones">
+      <div class="sidebar-heading"><span>TU UNIVERSO</span><span class="small-dot"></span></div>
+      <h1>Un mapa.<br>Muchas posibilidades.</h1>
+      <p class="sidebar-intro">Becas, habilidades e ideas que pueden abrirte puertas.</p>
+      <button type="button" class="button primary sidebar-add" id="add-card">＋ Agregar cuadro</button>
+      <nav id="collections" aria-label="Filtrar oportunidades">
+        <button class="collection active" data-filter="all" aria-pressed="true"><span class="collection-symbol">◎</span><span>Todas</span><span class="count" id="count-all">22</span></button>
+        <button class="collection" data-filter="money" aria-pressed="false"><span class="collection-symbol money">◈</span><span>Apoyo económico</span><span class="count" id="count-money"></span></button>
+        <button class="collection" data-filter="learn" aria-pressed="false"><span class="collection-symbol learn">▤</span><span>Formación</span><span class="count" id="count-learn"></span></button>
+        <button class="collection" data-filter="venture" aria-pressed="false"><span class="collection-symbol venture">↗</span><span>Emprendimiento</span><span class="count" id="count-venture"></span></button>
+        <button class="collection" data-filter="university" aria-pressed="false"><span class="collection-symbol university">◇</span><span>Universidad</span><span class="count" id="count-university"></span></button>
+      </nav>
+      <div class="sidebar-divider"></div>
+      <div class="priority-heading">IMPORTANCIA</div>
+      <div id="priority-filters" class="priority-filters"></div>
+      <div class="sidebar-bottom"><span class="avatar">J</span><div><strong>Hecho para Julián</strong><small>Ingeniería · formación · proyectos</small></div></div>
+    </aside>
+    <main class="map-main">
+      <div class="map-heading"><div><div class="eyebrow">MAPA PERSONAL / SANTANDER Y MÁS</div><h2>Todo empieza con una oportunidad<span class="heading-dot">.</span></h2></div><div class="view-switch" aria-label="Tipo de vista"><button id="spatial-view" class="active" aria-pressed="true">Espacial</button><button id="list-view" aria-pressed="false">Lista</button></div></div>
+      <div class="map-subbar"><div class="map-meta"><span id="visible-count">22 oportunidades</span><span>·</span><span id="selection-count">Ninguna seleccionada</span><button id="undo" disabled aria-label="Deshacer último cambio">↶ Deshacer</button></div><div class="map-sub-actions"><button id="show-links" aria-pressed="true">Rutas visibles</button></div></div>
+      <div class="board" id="board" tabindex="0" aria-label="Mapa cartesiano 3D. Ctrl + clic selecciona varios cuadros. Un clic izquierdo selecciona y muestra los tiradores. Clic derecho sostenido mueve tarjetas. Arrastrar con el izquierdo mueve la vista. Rueda acerca al puntero, incluso durante el arrastre. Enter para seleccionar y flechas para mover.">
+        <div class="ambient ambient-one"></div><div class="ambient ambient-two"></div><svg class="cartesian" id="cartesian" aria-label="Plano verde XY, plano rojo XZ y plano azul YZ con divisiones cada 100 unidades"></svg>
+        <div class="world-label" id="world-label">TU ESPACIO DE POSIBILIDADES</div><div class="plane-legend"><span class="plane-green">XY</span><span class="plane-red">XZ</span><span class="plane-blue">YZ</span><small>100 u / división</small></div>
+        <svg class="connections" id="connections" aria-label="Rutas entre oportunidades"></svg>
+        <div id="cards-layer"></div><svg id="resize-layer" class="resize-layer" aria-label="Tiradores de tamaño del objeto seleccionado"></svg><div id="selection-box" class="selection-box" hidden></div>
+        <div class="board-empty" id="board-empty" hidden>No hay oportunidades en esta vista.<button class="button" id="clear-filter">Ver todas</button></div>
+        <div class="map-tools"><button id="pan-tool" class="tool active" aria-label="Mover el mapa" aria-pressed="true">✥</button><button id="orbit-tool" class="tool" aria-label="Girar perspectiva" aria-pressed="false">⟳</button><span></span><button id="zoom-out" class="tool" aria-label="Alejar">−</button><button id="zoom-in" class="tool" aria-label="Acercar">＋</button><button id="fit" class="tool" aria-label="Encuadrar todas las tarjetas visibles">⛶</button><span></span><button id="flat" class="tool text-tool" aria-pressed="false">2D</button></div>
+        <div class="board-hint" id="board-hint">Izquierdo: mover vista · Derecho sostenido: mover tarjeta · Rueda: zoom al puntero</div>
+        <div class="zoom-value" id="zoom-value">100%</div>
+        <div class="mini-map" id="mini-map" aria-hidden="true"><div class="mini-caption">EXPLORA EL MAPA</div><svg id="mini-svg" viewBox="0 0 150 84"></svg></div>
+      </div>
+      <section class="list-panel" id="list-panel" aria-label="Lista de oportunidades" hidden></section>
+      <footer class="map-footer"><span><span class="legend-dot"></span> Posición libre en X · Y · Z</span><button id="organize">Organizar por importancia</button><span class="source-note">Datos del chat · condiciones por verificar</span></footer>
+    </main>
+    <aside class="inspector" id="inspector" aria-label="Detalle de oportunidad" hidden></aside>
+  </div>
+</div>
+<dialog id="editor" class="editor"><form id="edit-form"><div class="dialog-heading"><div><div class="eyebrow">TU MAPA SIGUE CRECIENDO</div><h2 id="editor-title">Nueva oportunidad</h2></div><button type="button" class="icon-button" id="editor-close" aria-label="Cerrar">×</button></div><label>Nombre<input name="title" required maxlength="120" placeholder="Ej. Beca de investigación UMG"></label><div class="form-row"><label>Tipo<select name="category"><option value="money">Apoyo económico</option><option value="learn">Formación</option><option value="venture">Emprendimiento</option><option value="university">Universidad</option></select></label><label>Importancia<select name="priority"><option value="5">Muy alta</option><option value="4">Alta</option><option value="3" selected>Media</option><option value="2">Baja</option><option value="1">Vigilancia</option></select></label></div><label>Beneficio<input name="benefit" maxlength="150" placeholder="Monto, curso, acompañamiento…"></label><label>Descripción<textarea name="description" rows="3" maxlength="2500" placeholder="De qué se trata y por qué te interesa"></textarea></label><div class="form-row"><label>Fecha límite<input name="deadline" type="date"></label><label>Estado<select name="status"><option>Por revisar</option><option>En proceso</option><option>Solicitada</option><option>Completada</option><option>Vigilar</option><option>Ruta futura</option><option>Descartada</option></select></label></div><label>Enlace oficial<input name="url" type="url" placeholder="https://…" maxlength="2000"></label><label>Próximo paso<textarea name="next" rows="2" maxlength="1500" placeholder="La siguiente acción concreta"></textarea></label><label>Tus notas<textarea name="notes" rows="2" maxlength="3000" placeholder="Requisitos, ideas, documentos pendientes…"></textarea></label><label class="check-label"><input name="verified" type="checkbox">Ya verifiqué la fecha y las condiciones en la fuente oficial</label><p class="editor-error" id="editor-error" role="alert" hidden></p><div class="dialog-actions"><button type="button" class="button" id="editor-cancel">Cancelar</button><button type="submit" class="button primary">Guardar oportunidad</button></div></form></dialog>
+<dialog id="help" class="help-dialog"><div class="dialog-heading"><h2>Tu mapa, a tu manera.</h2><button id="help-close" class="icon-button" aria-label="Cerrar ayuda">×</button></div><div class="help-steps"><p><strong>01 / Selecciona y mueve una idea</strong>Un clic izquierdo selecciona la idea y muestra sus tiradores de tamaño. Mantén el clic derecho sobre una tarjeta y arrástrala. Ctrl + clic añade o quita cuadros de la selección, con el izquierdo o el derecho.</p><p><strong>02 / Recorre el espacio</strong>Mantén el clic izquierdo y arrastra para mover la vista, también sobre una tarjeta. Activa ⟳ para girar los tres planos, o mantén Alt al arrastrar con el izquierdo.</p><p><strong>03 / Acércate al punto exacto</strong>La rueda hace zoom hacia el puntero. Puedes usarla mientras mantienes el clic derecho y mueves una tarjeta.</p><p><strong>04 / Cambia tamaño y posición</strong>Cada idea es un bloque pequeño y fijo en el espacio, con su nombre en las seis caras. Al seleccionarla, arrastra sus esquinas con el clic izquierdo para cambiar el tamaño proporcionalmente. Los tiradores de los bordes ajustan ancho X, largo Y y alto Z. La caja «Cambiar tamaño» permite escribir las dimensiones. Pulsa «Detalles» para abrir el panel lateral. También puedes ajustar las dimensiones en el detalle. Elige espacio libre o uno de los planos: verde XY, rojo XZ o azul YZ. Los campos X, Y y Z permiten una posición precisa. Cada división del plano equivale a 100 unidades.</p><p><strong>05 / Conecta tus ideas</strong>Selecciona varios cuadros con Ctrl y usa Conectar en la sección Conexiones de Cambiar tamaño. Allí puedes elegir una línea conectada y cambiar forma, tipo, grosor, color y dirección. Cuadro central dirige sus flechas hacia los otros cuadros. Para editar una línea, selecciona cualquiera de sus extremos.</p><p><strong>06 / Prioriza y conserva</strong>Edita la importancia sin perder la posición elegida. Los cambios se guardan en este navegador. Exporta una copia desde ••• para conservar posiciones, tamaños, notas y oportunidades.</p><p><strong>Teclado y pantalla táctil</strong>Tab y Enter seleccionan; las flechas mueven la idea; Mayús + flechas amplía el movimiento; Escape cierra el detalle. En una pantalla táctil arrastra una tarjeta para moverla.</p></div><button id="help-done" class="button primary">Explorar mi mapa</button></dialog>
+<div id="toast" class="toast" role="status" hidden></div>
+<script src="data.js?v=resize-visible-3"></script><script src="scene-math.js?v=resize-visible-3"></script><script src="color-utils.js?v=palette-5"></script><script src="palette.js?v=palette-5"></script><script src="connection-utils.js?v=connections-7"></script><script src="app.js?v=connections-7"></script>
+</body></html>
