@@ -70,14 +70,17 @@ const Pairing=(()=>{
    const old=await get(db,'SELECT * FROM orbita_browser_links WHERE browser_hash=?',bh),owner=ticket.owner_id;
    if(old?.owner_id&&old.owner_id!==owner)throw new Problem('Este navegador ya está vinculado a otra cuenta. Conservé tu mapa.',409,'connection_owner_conflict');
    const document=Core.data(b.data),view=Core.view(b.view);if(JSON.stringify(document).length>700000)throw new Problem('El mapa es demasiado grande. Tu copia local se conserva.',413);
-   const map=old?.owner_id?old.map_id:'map-'+crypto.randomUUID();
-   if(!old?.owner_id){const count=await get(db,'SELECT COUNT(*) AS n FROM orbita_maps WHERE owner_id=?',owner);if(count.n>=20)throw new Problem('Esta cuenta ya tiene 20 mapas compartidos.',409);}
+   const previous=old?.owner_id?await get(db,'SELECT document FROM orbita_maps WHERE owner_id=? AND map_id=?',owner,old.map_id):null;
+   // An older linked map must never replace the current local map, or be overwritten by it.
+   // Reuse only an identical snapshot; otherwise preserve the older map and bind a new snapshot.
+   const reuse=previous&&JSON.stringify(Core.data(JSON.parse(previous.document)))===JSON.stringify(document),map=reuse?old.map_id:'map-'+crypto.randomUUID();
+   if(!reuse){const count=await get(db,'SELECT COUNT(*) AS n FROM orbita_maps WHERE owner_id=?',owner);if(count.n>=20)throw new Problem('Esta cuenta ya tiene 20 mapas compartidos.',409);}
    // D1 batch is atomic. Every write is gated by the consumed request and browser binding.
    const guard='EXISTS(SELECT 1 FROM orbita_connection_requests WHERE token_hash=? AND browser_hash=? AND map_id=? AND session_id=?)';
    const bound='EXISTS(SELECT 1 FROM orbita_browser_links WHERE browser_hash=? AND owner_id=? AND map_id=?)';
    const results=await db.batch([
-     sql(db,'UPDATE orbita_connection_requests SET used_at=?,browser_hash=?,map_id=?,session_id=? WHERE token_hash=? AND used_at IS NULL AND expires_at>? AND NOT EXISTS(SELECT 1 FROM orbita_browser_links WHERE browser_hash=? AND owner_id IS NOT NULL AND owner_id<>?)',now,bh,map,b.session_id,digest,now,bh,owner),
-     sql(db,'INSERT INTO orbita_browser_links(browser_hash,code_hash,session_id,document,view,expires_at,owner_id,map_id) SELECT ?,NULL,?,?,?,?,?,? WHERE '+guard+' ON CONFLICT(browser_hash) DO UPDATE SET code_hash=NULL,owner_id=excluded.owner_id,map_id=excluded.map_id WHERE orbita_browser_links.owner_id IS NULL',bh,b.session_id,JSON.stringify(document),JSON.stringify(view),0,owner,map,digest,bh,map,b.session_id),
+     sql(db,'UPDATE orbita_connection_requests SET used_at=?,browser_hash=?,map_id=?,session_id=? WHERE token_hash=? AND used_at IS NULL AND expires_at>? AND NOT EXISTS(SELECT 1 FROM orbita_browser_links WHERE browser_hash=? AND owner_id IS NOT NULL AND (owner_id<>? OR map_id<>?))',now,bh,map,b.session_id,digest,now,bh,owner,old?.map_id||''),
+     sql(db,'INSERT INTO orbita_browser_links(browser_hash,code_hash,session_id,document,view,expires_at,owner_id,map_id) SELECT ?,NULL,?,?,?,?,?,? WHERE '+guard+' ON CONFLICT(browser_hash) DO UPDATE SET code_hash=NULL,owner_id=excluded.owner_id,map_id=excluded.map_id WHERE orbita_browser_links.owner_id IS NULL OR (orbita_browser_links.owner_id=excluded.owner_id AND orbita_browser_links.map_id=?)',bh,b.session_id,JSON.stringify(document),JSON.stringify(view),0,owner,map,digest,bh,map,b.session_id,old?.map_id||''),
      sql(db,'INSERT OR IGNORE INTO orbita_maps(owner_id,map_id,label,document,revision,history,last_op,updated_at) SELECT ?,?,?,?,1,?,?,? WHERE '+guard+' AND '+bound,owner,map,'Mi mapa de Órbita',JSON.stringify(document),'[]','connect-'+b.session_id,now,digest,bh,map,b.session_id,bh,owner,map),
      sql(db,'INSERT INTO orbita_sessions(owner_id,session_id,map_id,view,last_seen,applied_revision) SELECT ?,?,?,?,?,0 WHERE '+guard+' AND '+bound+' ON CONFLICT(owner_id,session_id) DO UPDATE SET map_id=excluded.map_id,view=excluded.view,last_seen=excluded.last_seen,applied_revision=0',owner,b.session_id,map,JSON.stringify(view),now,digest,bh,map,b.session_id,bh,owner,map),
      sql(db,'INSERT INTO orbita_active(owner_id,map_id,session_id) SELECT ?,?,? WHERE '+guard+' AND '+bound+' ON CONFLICT(owner_id) DO UPDATE SET map_id=excluded.map_id,session_id=excluded.session_id',owner,map,b.session_id,digest,bh,map,b.session_id,bh,owner,map)
