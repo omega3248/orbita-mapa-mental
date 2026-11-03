@@ -1,0 +1,1 @@
+{"name":"orbita-mapa-mental","private":true,"version":"1.0.0","description":"Mapa mental espacial con control directo MCP","scripts":{"build":"node scripts/build-direct.cjs","check":"node scripts/check-direct.cjs"}}

@@ -19,7 +19,7 @@ Un mapa mental espacial para ordenar ideas de forma más natural, visual e inter
 Aplicación estática escrita con HTML, CSS y JavaScript, sin dependencias de compilación. Desde la raíz del repositorio:
 
 ```sh
-python -m http.server 8080 --directory dist
+python -m http.server 8080 --directory public
 ```
 
 Abre `http://localhost:8080` en el navegador.
@@ -34,11 +34,30 @@ La demostración incluye becas, cursos y programas de emprendimiento como ejempl
 
 ## Archivos principales
 
-- `dist/index.html` y `dist/style.css`: interfaz y diseño adaptable.
-- `dist/app.js`: mapa, selección, controles, persistencia y edición.
-- `dist/scene-math.js`: proyección espacial, cámara y dimensiones.
-- `dist/connection-utils.js`: conexiones y flechas.
-- `dist/color-utils.js` y `dist/palette.js`: color y paleta interactiva.
-- `dist/data.js`: ideas y relaciones del ejemplo inicial.
+- `public/index.html` y `public/style.css`: interfaz y diseño adaptable.
+- `public/app.js`: mapa, selección, controles, persistencia y edición.
+- `public/scene-math.js`: proyección espacial, cámara y dimensiones.
+- `public/connection-utils.js`: conexiones y flechas.
+- `public/color-utils.js` y `public/palette.js`: color y paleta interactiva.
+- `public/data.js`: ideas y relaciones del ejemplo inicial.
 
 Desarrollado como proyecto personal de Julián Ortiz.
+
+
+## Direct chat control (MCP)
+
+The same Site now serves a dependency-free Cloudflare Worker, public frontend assets, authenticated user-owned D1 maps, and a stateless JSON-RPC MCP endpoint at `/mcp`. The hosting audience is preserved. Public anonymous visitors can keep using local maps; shared map endpoints and MCP actions require dispatch-provided ChatGPT identity. No OpenAI API key or separate voice model is used.
+
+On the first authenticated load, the current browser map is copied to `orbita-julian-map-v1:before-direct-v1` before migration. No prepared file or example state replaces it. Each shared map is partitioned by Site-scoped user identity and map ID. The visible button `Usar este mapa en el chat` explicitly selects its session. Another tab does not steal an active session. Orders fail honestly if the selected view is disconnected, hidden, busy, or changed.
+
+Tools: `orbita_get_active_map`, `orbita_apply_actions`, `orbita_delete_cards`, `orbita_undo`, `orbita_command_status`. Use the map/session IDs returned by the read tool. Each mutation has a request ID, optimistic revision control and one undo entry for a whole batch. Relative moves use the most recently reported camera and viewport; `screen_dy: -100` moves a card upward without panning the camera. The response says applied only after the selected browser session acknowledges the revision. Otherwise it returns a saved/pending status and the same request ID for status lookup.
+
+Foreground sync polls at 800 ms; background polling is slower. The connection reconnects with the same map binding and keeps local edits for reconciliation. Manual edits use field patches and revision checks so unrelated concurrent fields are preserved. Undo is shared across browser and chat edits. No arbitrary JavaScript execution or browser debugging is exposed by the connector.
+
+### Build and local preview
+
+Source frontend files are under `public/`; `worker/service.js` implements the service and MCP tools. Run `npm run build` to embed all assets in `dist/server/index.js`. No dependency installation is needed. Run `node scripts/local-worker.cjs` for a local preview at `http://127.0.0.1:4175`. The preview uses Node SQLite with an isolated in-memory database and a fixed local mock identity; that mock identity is not part of the deployed Worker. Production D1 schema changes are append-only SQL migrations under `drizzle/`.
+
+The Sites-managed plugin is created/refreshed when publishing with the `mcp` capability. Reuse that plugin instead of registering another server or editing Codex internals. If installation is needed, install/connect the personal plugin returned by Sites. A single initial load of the new Site version is required to start the browser channel; routine commands need neither recargas, screenshots nor browser automation.
+
+Validation: one real local browser session acknowledged a direct move in 754 ms. This is a local measurement, not a production latency guarantee. Essential checks cover relative geometry, request deduplication, per-user isolation, manual saves, undo, conflict handling and durable map reconnection.

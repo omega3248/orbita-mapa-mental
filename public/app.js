@@ -5,6 +5,7 @@
  const Space=window.OrbitaSpace;
  const Color=window.OrbitaColor;
  const Links=window.OrbitaConnections;
+ let directSync=null,receivingDirect=false;
  const DEFAULT_PLANES={XY:'#65eb83',XZ:'#f38173',YZ:'#8694ff'};
  const DEFAULT_PALETTE=['#d9ed91','#f7d094','#de91aa','#a994f7','#59e8df'];
  function normalizeTheme(raw){const planes={...DEFAULT_PLANES},sectors={};for(const key of Object.keys(planes))if(Color.hex(raw?.planes?.[key]))planes[key]=Color.hex(raw.planes[key]);for(const [key,value]of Object.entries(raw?.sectors||{}))if(/^(XY|XZ|YZ):[+-]{2}$/.test(key)&&Color.hex(value))sectors[key]=Color.hex(value);return {planes,sectors};}
@@ -82,6 +83,7 @@
  function save(){
    try {localStorage.setItem(KEY,JSON.stringify(state));storageAvailable=true;$('save-indicator').textContent='Guardado en este navegador';}
    catch{storageAvailable=false;$('save-indicator').textContent='Guardado no disponible · exporta tu mapa';toast('No se pudo guardar aquí. Exporta una copia desde •••.');}
+   if(!receivingDirect)directSync?.localChanged();
  }
  let toastTimer;
  function toast(message){clearTimeout(toastTimer);$('toast').textContent=message;$('toast').hidden=false;toastTimer=setTimeout(()=>$('toast').hidden=true,4200);}
@@ -466,7 +468,7 @@
    for(const p of[5,4,3,2,1]){const cards=groups[p];if(!cards.length)continue;const cols=Math.min(4,cards.length);cards.forEach((c,i)=>{c.x=(i%cols-(cols-1)/2)*325;c.y=y+Math.floor(i/cols)*290;c.z=depthFor(p);});y+=Math.ceil(cards.length/cols)*290+65;}
    fit(visibleCards(),false);save();renderAll();toast('Tarjetas organizadas. Puedes seguir moviéndolas libremente.');
  };
- function undo(){const s=history.pop();if(!s)return;state.cards=s.cards;state.deleted=s.deleted;state.camera=s.camera;state.theme=normalizeTheme(s.theme);state.palette=s.palette||[...DEFAULT_PALETTE];state.links=Links.normalizeAll(s.links,state.cards);selected=new Set([...selected].filter(id=>state.cards.some(c=>c.id===id)));focusedId=selected.has(focusedId)?focusedId:[...selected].at(-1)||null;save();renderAll();$('undo').disabled=!history.length;toast('Cambio deshecho.');}
+ function undo(){if(directSync?.connected){directSync.undo();return;}const s=history.pop();if(!s)return;state.cards=s.cards;state.deleted=s.deleted;state.camera=s.camera;state.theme=normalizeTheme(s.theme);state.palette=s.palette||[...DEFAULT_PALETTE];state.links=Links.normalizeAll(s.links,state.cards);selected=new Set([...selected].filter(id=>state.cards.some(c=>c.id===id)));focusedId=selected.has(focusedId)?focusedId:[...selected].at(-1)||null;save();renderAll();$('undo').disabled=!history.length;toast('Cambio deshecho.');}
  $('undo').onclick=undo;
  function openEditor(id=null){
    editingId=id;const c=state.cards.find(c=>c.id===id),form=$('edit-form');form.reset();$('editor-error').hidden=true;$('editor-title').textContent=c?'Editar oportunidad':'Nueva oportunidad';
@@ -506,4 +508,17 @@
  if(!saved){homeView(false);save();}else if(migrated)save();
  requestRender();
  if(!storageAvailable)toast('El guardado local no está disponible. Puedes exportar el mapa para conservarlo.');
+ directSync=new window.OrbitaDirect({
+   hasSavedData:saved,
+   getState:()=>clone(state),
+   getView:()=>({camera:clone(state.camera),width:board.clientWidth,height:board.clientHeight,busy:!!drag||$('editor').open||paletteEditor.dialog.open}),
+   applyData:(data,canUndo)=>{
+     receivingDirect=true;
+     try{state.cards=data.cards.map(normalize);state.links=Links.normalizeAll(data.links,state.cards);state.deleted=data.deleted;state.theme=normalizeTheme(data.theme);state.palette=data.palette;
+       selected=new Set([...selected].filter(id=>state.cards.some(c=>c.id===id)));focusedId=selected.has(focusedId)?focusedId:[...selected].at(-1)||null;
+       save();renderAll();$('undo').disabled=!canUndo;
+     }finally{receivingDirect=false;}
+   }
+ });
+ directSync.start();
 })();
