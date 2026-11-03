@@ -26,13 +26,14 @@ const {database,worker,migrate}=require('./local-worker.cjs'),Core=require('../p
      state.cards[0].notes='Cambio manual mientras llegaba la respuesta';state.cards[0].x+=11;
      return response;
    }
+   if(path==='/api/me'&&capture)state.cards[0].y+=17;
    return app.fetch(new Request(origin+path,options),{DB:db});
  }};
  vm.runInNewContext(fs.readFileSync(require('node:path').join(__dirname,'../public/direct-sync.js'),'utf8'),sandbox);
  const direct=new win.OrbitaDirect({hasSavedData:true,getState:()=>state,getView:()=>view,applyData:data=>{state=structuredClone(data);}});
  await direct.start();assert.equal(nodes.get('#direct-target').textContent,'Conectar con: Julián de prueba');assert.equal(direct.connected,false);
  await direct.connectFromChat();assert.equal(direct.connected,true);assert.equal(direct.active,true);assert.match(nodes.get('#direct-status').textContent,/Conectado/);
- assert.equal(state.cards.length,1);assert.equal(state.links.length,0);assert.equal(state.cards[0].x,original.cards[0].x+11);assert.equal(state.cards[0].notes,'Cambio manual mientras llegaba la respuesta');assert.equal(state.cards[0].width,480);assert.deepEqual(view.camera,camera);
+ assert.equal(state.cards.length,1);assert.equal(state.links.length,0);assert.equal(state.cards[0].x,original.cards[0].x+11);assert.equal(state.cards[0].y,original.cards[0].y+17);assert.equal(state.cards[0].notes,'Cambio manual mientras llegaba la respuesta');assert.equal(state.cards[0].width,480);assert.deepEqual(view.camera,camera);
  const active=(await rpc()).structuredContent;assert.equal(active.connected,true);assert.equal(active.cards[0].x,state.cards[0].x);assert.equal(active.session_id,session);assert.equal(active.connection_url,undefined);
  const recovered=await call('/api/connection/claim',capture,{browser:key});assert.equal(recovered.status,200);assert.equal(recovered.data.map_id,active.map_id);
  const replay=await call('/api/connection/claim',capture,{browser:'b'.repeat(64)});assert.equal(replay.data.code,'connection_expired');

@@ -31,7 +31,7 @@
        if(this.link?.owner_id&&this.link.owner_id!==me.user_id){this.pairingNeeded=true;this.status('Vincula este mapa con el chat que quieres usar');return;}
        this.pairingNeeded=false;this.owner=me.user_id;
        if(!localStorage.getItem(KEY+':before-direct-v1'))localStorage.setItem(KEY+':before-direct-v1',JSON.stringify(this.api.getState()));
-       const before=this.stateData(),savedPatch=this.link?.pending;
+       const before=this.stateData(),savedPatch=this.link?.base?Core.diff(this.link.base,before):this.link?.pending;
        const result=await this.request('/api/connect',{map_id:me.map_id||this.link?.map_id||null,session_id:this.sessionId,has_local_data:this.api.hasSavedData||this.pending,data:before,view:this.getView()});
        const duringConnection=Core.diff(before,this.stateData());
        this.mapId=result.map_id;this.base=result.data;this.revision=result.revision;this.active=result.active;this.connected=true;this.retry=800;
