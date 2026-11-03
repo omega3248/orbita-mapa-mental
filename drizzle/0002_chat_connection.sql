@@ -1,0 +1,1 @@
+CREATE TABLE orbita_connection_requests (token_hash TEXT PRIMARY KEY NOT NULL, owner_id TEXT NOT NULL, target_label TEXT NOT NULL, expires_at INTEGER NOT NULL, used_at INTEGER, browser_hash TEXT, map_id TEXT, session_id TEXT);

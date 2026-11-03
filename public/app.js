@@ -505,7 +505,7 @@
  document.querySelector('.brand').onclick=e=>{e.preventDefault();state.filter='all';state.priorityFilter=0;clearSelection();renderAll();homeView();};
  new ResizeObserver(()=>requestRender()).observe(board);
  renderAll();
- if(!saved){homeView(false);save();}else if(migrated)save();
+ if(!saved){homeView(false);if(!window.OrbitaConnectionToken)save();}else if(migrated)save();
  requestRender();
  if(!storageAvailable)toast('El guardado local no está disponible. Puedes exportar el mapa para conservarlo.');
  directSync=new window.OrbitaDirect({
