@@ -6,7 +6,7 @@ const stmt=(db,sql,...args)=>db.prepare(sql).bind(...args);
 const one=(db,sql,...args)=>stmt(db,sql,...args).first();
 const decode=row=>row?{map_id:row.map_id,label:row.label,revision:row.revision,data:JSON.parse(row.document),can_undo:JSON.parse(row.history).length>0}:null;
 const getMap=(db,owner,map)=>one(db,'SELECT * FROM orbita_maps WHERE owner_id=? AND map_id=?',owner,id(map));
-function identity(request){const user=request.headers.get('oai-authenticated-user-id');if(!user)throw new Problem('Conecta Órbita con tu cuenta de ChatGPT para usar el chat.',401,'auth_required');return user;}
+function identity(request){const user=request.headers.get('oai-authenticated-user-id');if(!user)throw new Problem('La herramienta requiere la conexión autorizada del chat.',401,'auth_required');return user;}
 async function body(request){const size=Number(request.headers.get('content-length')||0);if(size>3*1024*1024)throw new Problem('El mapa supera el límite de 3 MB.',413);const text=await request.text();if(text.length>3*1024*1024)throw new Problem('El mapa supera el límite de 3 MB.',413);try{return JSON.parse(text);}catch{throw new Problem('El JSON no es válido.');}}
 async function active(db,owner){const binding=await one(db,'SELECT * FROM orbita_active WHERE owner_id=?',owner);if(!binding)return {connected:false,reason:'Abre Órbita y pulsa Usar este mapa en el chat.'};const session=await one(db,'SELECT * FROM orbita_sessions WHERE owner_id=? AND session_id=? AND map_id=?',owner,binding.session_id,binding.map_id),map=await getMap(db,owner,binding.map_id);if(!session||!map)return {connected:false,reason:'No hay una sesión activa.'};const view=JSON.parse(session.view),age=Date.now()-session.last_seen;return {map_id:map.map_id,map_name:map.label,session_id:session.session_id,revision:map.revision,connected:age<10000&&view.visible!==false&&view.width>=50&&view.height>=50,busy:view.busy===true,last_seen_ms:age,reason:age>=10000?'La vista está desconectada. Abre el mapa.':view.visible===false?'La vista activa está oculta. Muestra el mapa.':view.width<50||view.height<50?'La vista activa no está disponible.':'',cards:JSON.parse(map.document).cards.map(c=>({id:c.id,title:c.title,x:c.x,y:c.y,z:c.z,width:c.width,height:c.height,thickness:c.thickness})),connection_count:JSON.parse(map.document).links.length,can_undo:JSON.parse(map.history).length>0};}
 async function requireSession(db,owner,mapId,sessionId){const a=await active(db,owner);if(!a.connected)throw new Problem(a.reason,409,'disconnected');if(a.map_id!==mapId||a.session_id!==sessionId)throw new Problem('La sesión activa cambió. Consulta orbita_get_active_map y usa sus identificadores.',409,'wrong_session');if(a.busy)throw new Problem('Estás editando el mapa. Espera a terminar ese gesto.',409,'busy');return one(db,'SELECT * FROM orbita_sessions WHERE owner_id=? AND session_id=?',owner,sessionId);}
@@ -36,6 +36,7 @@ const actionSchema={type:'object',additionalProperties:false,required:['type'],p
 const common={map_id:str,session_id:str,request_id:{type:'string',description:'Identificador único de esta intención. Reutilízalo al reintentar para no duplicar el movimiento.'}};
 const input=(extra={},required=[])=>({type:'object',additionalProperties:false,properties:{...common,...extra},required:['map_id','session_id','request_id',...required]});
 const TOOLS=[
+ {name:'orbita_pair_map',description:'Vincula de forma privada el mapa del navegador con este chat usando el código temporal ORBITA que el usuario copia de la web. No pide iniciar sesión en la web. El código caduca en cinco minutos y se utiliza una sola vez. Después consulta orbita_get_active_map. Si el código ya fue usado, consulta el mapa activo antes de pedir otro.',inputSchema:{type:'object',properties:{pairing_code:{type:'string'}},required:['pairing_code'],additionalProperties:false},annotations:{readOnlyHint:false,destructiveHint:false,idempotentHint:false,openWorldHint:false}},
  {name:'orbita_get_active_map',description:'Consulta el mapa y la sesión de Órbita que el usuario ha activado, su conexión y sus cuadros. Úsala antes de editar. No controles el navegador ni pidas capturas para cambios rutinarios.',inputSchema:{type:'object',properties:{},additionalProperties:false},annotations:{readOnlyHint:true,openWorldHint:false}},
  {name:'orbita_apply_actions',description:'Aplica una o varias ediciones como una única acción deshacible al mapa activo. Crear, editar, mover, cambiar tamaño, conectar y modificar conexiones. Para «sube Santander» usa type=move,target=Santander,screen_dx=0,screen_dy=-100. Conserva cámara y demás ajustes. Devuelve applied=true sólo cuando la vista confirma recepción; si queda pendiente consulta el estado con el mismo request_id.',inputSchema:input({actions:{type:'array',minItems:1,maxItems:100,items:actionSchema}},['actions']),annotations:{readOnlyHint:false,destructiveHint:false,idempotentHint:true,openWorldHint:false}},
  {name:'orbita_delete_cards',description:'Elimina del mapa activo los cuadros indicados y sus conexiones. Es una sola acción recuperable con orbita_undo. Úsala sólo si el usuario pide eliminar esos cuadros.',inputSchema:input({targets:{type:'array',minItems:1,maxItems:500,items:targetSchema}},['targets']),annotations:{readOnlyHint:false,destructiveHint:true,idempotentHint:true,openWorldHint:false}},
@@ -52,6 +53,7 @@ async function mcp(request,env){
    else if(rpc.method==='tools/call'){
      const owner=identity(request),args=rpc.params?.arguments||{},name=rpc.params?.name;let value;
      if(name==='orbita_get_active_map')value=await active(env.DB,owner);
+     else if(name==='orbita_pair_map'){value=await Pairing.claim(env.DB,owner,args.pairing_code);const start=Date.now();while(Date.now()-start<2400){const s=await one(env.DB,'SELECT applied_revision FROM orbita_sessions WHERE owner_id=? AND session_id=?',owner,value.session_id);if(s?.applied_revision>=1){value.connected=true;value.message='Mapa vinculado y conectado a esta vista.';break;}await new Promise(resolve=>setTimeout(resolve,180));}}
      else if(name==='orbita_command_status')value=await operationStatus(env.DB,owner,args.request_id);
      else if(['orbita_apply_actions','orbita_delete_cards','orbita_undo'].includes(name)){
        const started=Date.now();if(name==='orbita_delete_cards'){if(!Array.isArray(args.targets)||!args.targets.length||args.targets.length>500)throw new Problem('Indica los cuadros que quieres eliminar.');args.actions=args.targets.map(target=>({type:'delete',target}));}
@@ -64,11 +66,14 @@ async function mcp(request,env){
  if(rpc.id===undefined)return new Response(null,{status:204});return json({jsonrpc:'2.0',id:rpc.id,result});
 }
 async function api(request,env,path){
- if(path==='/api/me')return json({authenticated:!!request.headers.get('oai-authenticated-user-id'),user_id:request.headers.get('oai-authenticated-user-id')||null});
- const owner=identity(request);if(request.method!=='POST')throw new Problem('Método no permitido.',405);
+ if(path==='/api/me'){const c=await Pairing.context(request,env.DB);return json({authenticated:!!c,user_id:c?.owner||null,map_id:c?.bound_map||null,pairing_available:true});}
+ if(request.method!=='POST')throw new Problem('Método no permitido.',405);
  if(request.headers.get('x-orbita-client')!=='1')throw new Problem('Solicitud no válida.',403);
  const origin=request.headers.get('origin');if(origin&&origin!==new URL(request.url).origin&&origin!=='https://orbita-julian-oportunidades.jorgeortizguerra33.chatgpt.site')throw new Problem('Origen no permitido.',403);
  const b=await body(request),db=env.DB;
+ if(['/api/pair/start','/api/pair/status'].includes(path))return json(await Pairing.route(request,db,path,b));
+ const context=await Pairing.context(request,db);if(!context)throw new Problem('Vincula este mapa con el código temporal que aparece en la web.',401,'pairing_required');const owner=context.owner;
+ if(context.bound_map){if(b.map_id&&b.map_id!==context.bound_map)throw new Problem('Esta vinculación no permite acceder a otro mapa.',403);b.map_id=context.bound_map;}
  if(path==='/api/connect'){
    const sessionId=id(b.session_id),v=Core.view(b.view);let map=b.map_id?await getMap(db,owner,b.map_id):null;
    const a=await one(db,'SELECT * FROM orbita_active WHERE owner_id=?',owner);if(!map&&!b.has_local_data&&a)map=await getMap(db,owner,a.map_id);
@@ -76,6 +81,7 @@ async function api(request,env,path){
    await stmt(db,'INSERT INTO orbita_sessions(owner_id,session_id,map_id,view,last_seen,applied_revision) VALUES(?,?,?,?,?,0) ON CONFLICT(owner_id,session_id) DO UPDATE SET map_id=excluded.map_id,view=excluded.view,last_seen=excluded.last_seen',owner,sessionId,map.map_id,JSON.stringify(v),Date.now()).run();
    let choose=!a;if(a){const old=await one(db,'SELECT last_seen FROM orbita_sessions WHERE owner_id=? AND session_id=?',owner,a.session_id);choose=!old||Date.now()-old.last_seen>15000||a.session_id===sessionId;}
    if(choose)await stmt(db,'INSERT INTO orbita_active(owner_id,map_id,session_id) VALUES(?,?,?) ON CONFLICT(owner_id) DO UPDATE SET map_id=excluded.map_id,session_id=excluded.session_id',owner,map.map_id,sessionId).run();
+   await Pairing.attach(request,db,owner,map.map_id,sessionId,v);
    return json({...decode(map),owner_id:owner,active:choose,session_id:sessionId});
  }
  const mapId=id(b.map_id),sessionId=id(b.session_id),session=await one(db,'SELECT * FROM orbita_sessions WHERE owner_id=? AND session_id=? AND map_id=?',owner,sessionId,mapId);if(!session)throw new Problem('La sesión no pertenece a este mapa.',403);

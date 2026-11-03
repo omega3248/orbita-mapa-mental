@@ -1,0 +1,1 @@
+CREATE TABLE orbita_browser_links (browser_hash TEXT PRIMARY KEY NOT NULL, code_hash TEXT UNIQUE, session_id TEXT NOT NULL, document TEXT NOT NULL, view TEXT NOT NULL, expires_at INTEGER NOT NULL, owner_id TEXT, map_id TEXT);

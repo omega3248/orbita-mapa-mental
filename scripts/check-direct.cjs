@@ -19,6 +19,6 @@ const {database,worker,migrate}=require('./local-worker.cjs'),Core=require('../p
  const undone=await call('/api/undo',{map_id:map,session_id:session,request_id:'undo_note'});assert.equal(undone.data.data.cards[0].notes,before.notes);
  const conflict=await call('/api/save',{map_id:map,session_id:session,base_revision:1,request_id:'stale_write',patch});assert.equal(conflict.data.conflict,true);
  const persisted=await call('/api/connect',{map_id:map,session_id:'view_reconnected',has_local_data:true,data:{cards:[]},view});assert.equal(persisted.data.data.cards.length,1);assert.equal(persisted.data.data.cards[0].title,'Beca Santander');
- const tools=await call('/mcp',{jsonrpc:'2.0',id:9,method:'tools/list'},null);assert.equal(tools.data.result.tools.length,5);
+ const tools=await call('/mcp',{jsonrpc:'2.0',id:9,method:'tools/list'},null);assert.equal(tools.data.result.tools.length,6);
  console.log('PASS: one end-to-end command + view acknowledgement, exact screen-relative movement, idempotency, identity isolation, manual save/undo, conflict protection and persistence.');
 })().catch(e=>{console.error(e);process.exitCode=1;});
